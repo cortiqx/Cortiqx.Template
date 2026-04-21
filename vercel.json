@@ -1,16 +1,11 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist/client",
-  "framework": null,
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "dist/server/**"
-    }
-  },
+  "outputDirectory": "dist",
+  "framework": "vite",
   "rewrites": [
     {
-      "source": "/((?!assets/).*)",
-      "destination": "/api/index"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
