@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Mail, ArrowRight, Loader2 } from "lucide-react";
+import { Mail, ArrowRight, Loader2, ArrowLeft } from "lucide-react";
 import { signInWithGoogle, signInWithEmail } from "@/firebase/auth";
 import { syncUser } from "@/services/userService";
 import { auth } from "@/firebase/config";
@@ -65,7 +65,11 @@ function LoginPage() {
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-background px-6">
+    <div className="grid min-h-screen place-items-center bg-background px-6 relative">
+      <Link to="/" className="absolute left-6 top-6 flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" />
+        Back to Home
+      </Link>
       <div className="w-full max-w-sm">
         <Link to="/" className="mb-8 flex items-center justify-center gap-2">
           <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground font-bold">

@@ -92,7 +92,7 @@ function AdminLayout() {
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-border bg-background transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0",
+            "fixed inset-y-0 left-0 z-40 flex w-64 flex-col -translate-x-full border-r border-border bg-background transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0",
             open && "translate-x-0",
           )}
         >
@@ -102,7 +102,7 @@ function AdminLayout() {
             </span>
             <span className="font-display text-lg font-semibold">Cortiqx Templates Admin</span>
           </div>
-          <nav className="space-y-1 p-3">
+          <nav className="flex-1 space-y-1 p-3">
             {nav.map((it) => {
               const active = it.exact
                 ? location.pathname === it.to
@@ -126,6 +126,16 @@ function AdminLayout() {
               );
             })}
           </nav>
+          
+          <div className="border-t border-border p-3">
+            <Link
+              to="/"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-foreground/70 transition hover:bg-muted text-destructive"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back to Home
+            </Link>
+          </div>
         </aside>
 
         {open && (
