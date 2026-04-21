@@ -1,0 +1,75 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Mail, ArrowRight } from "lucide-react";
+
+export const Route = createFileRoute("/login")({
+  head: () => ({
+    meta: [
+      { title: "Sign in — Cortiqx Templates" },
+      { name: "description", content: "Sign in to Cortiqx Templates to save and download templates." },
+    ],
+  }),
+  component: LoginPage,
+});
+
+function LoginPage() {
+  const [email, setEmail] = useState("");
+
+  return (
+    <div className="grid min-h-screen place-items-center bg-background px-6">
+      <div className="w-full max-w-sm">
+        <Link to="/" className="mb-8 flex items-center justify-center gap-2">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground font-bold">
+            C
+          </span>
+          <span className="font-display text-2xl font-semibold">Cortiqx Templates</span>
+        </Link>
+
+        <h1 className="text-center font-display text-2xl font-semibold tracking-tight">
+          Welcome back
+        </h1>
+        <p className="mt-1 text-center text-sm text-muted-foreground">
+          Enter your email to continue
+        </p>
+
+        <form className="mt-8 space-y-3" onSubmit={(e) => e.preventDefault()}>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-full border border-border bg-card py-3.5 pl-11 pr-4 text-sm outline-none focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] active:scale-[0.99]"
+          >
+            Continue <ArrowRight className="h-4 w-4" />
+          </button>
+        </form>
+
+        <div className="mt-6 flex items-center gap-3">
+          <span className="h-px flex-1 bg-border" />
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">or</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <button
+          type="button"
+          className="mt-6 w-full rounded-full border border-border bg-card px-4 py-3 text-sm font-medium"
+        >
+          Continue with Google
+        </button>
+
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          By continuing you agree to our Terms & Privacy Policy.
+        </p>
+      </div>
+    </div>
+  );
+}
