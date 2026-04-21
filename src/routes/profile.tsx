@@ -1,6 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Upload, Heart, ShoppingBag, Settings, LogOut, ChevronRight, Shield } from "lucide-react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { Upload, Heart, ShoppingBag, Settings, LogOut, ChevronRight, Shield, User as UserIcon, Loader2 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
+import { useState, useEffect } from "react";
+import { auth } from "@/firebase/config";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { getUserRole } from "@/services/userService";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -13,23 +17,70 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<string>("user");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        const r = await getUserRole(u.uid);
+        setRole(r);
+      } else {
+        setRole("user");
+      }
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    router.navigate({ to: "/" });
+  };
+
+  if (loading) {
+    return (
+      <PageShell>
+        <div className="grid min-h-[50vh] place-items-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell>
       <section className="px-4 pt-6">
-        <div className="flex items-center gap-4">
-          <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-primary to-accent text-2xl font-semibold text-primary-foreground">
-            A
+        {user ? (
+          <div className="flex items-center gap-4">
+            <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-to-br from-primary to-accent text-2xl font-semibold text-primary-foreground">
+              {user.email?.charAt(0).toUpperCase() || "U"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="truncate font-display text-xl font-semibold">{user.displayName || "User"}</h1>
+              <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+            </div>
           </div>
-          <div className="flex-1">
-            <h1 className="font-display text-xl font-semibold">Aanya Sharma</h1>
-            <p className="text-sm text-muted-foreground">aanya@example.com</p>
+        ) : (
+          <div className="flex items-center gap-4">
+            <div className="grid h-16 w-16 place-items-center rounded-full bg-muted text-muted-foreground">
+              <UserIcon className="h-8 w-8" />
+            </div>
+            <div>
+              <h1 className="font-display text-xl font-semibold">Guest</h1>
+              <Link to="/login" className="mt-1 inline-block text-sm font-medium text-primary hover:underline">
+                Sign in or create account
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="mt-5 grid grid-cols-3 gap-2 rounded-2xl bg-card p-3 shadow-[var(--shadow-card)]">
-          <Stat label="Saved" value="12" />
-          <Stat label="Bought" value="3" />
-          <Stat label="Uploaded" value="0" />
+        <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl bg-card p-3 shadow-[var(--shadow-card)]">
+          <Stat label="Saved" value={user ? "12" : "0"} />
+          <Stat label="Purchases" value={user ? "3" : "0"} />
         </div>
       </section>
 
@@ -39,8 +90,10 @@ function ProfilePage() {
         </h2>
         <div className="overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-card)]">
           <Row to="/saved" icon={Heart} label="Saved templates" />
-          <Row to="/upload" icon={Upload} label="Upload a template" />
           <Row to="/profile" icon={ShoppingBag} label="My purchases" />
+          {user && (role === "admin" || role === "developer") && (
+            <Row to="/upload" icon={Upload} label="Upload a template" />
+          )}
         </div>
       </section>
 
@@ -49,9 +102,29 @@ function ProfilePage() {
           More
         </h2>
         <div className="overflow-hidden rounded-2xl bg-card shadow-[var(--shadow-card)]">
-          <Row to="/admin" icon={Shield} label="Admin dashboard" />
-          <Row to="/profile" icon={Settings} label="Settings" />
-          <Row to="/login" icon={LogOut} label="Sign out" danger />
+          {role === "admin" && (
+            <Row to="/admin" icon={Shield} label="Admin dashboard" />
+          )}
+          {user ? (
+            <>
+              <Row to="/profile" icon={Settings} label="Settings" />
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="flex w-full items-center gap-3 border-b border-border/60 px-4 py-3.5 last:border-b-0 active:bg-muted"
+              >
+                <div className="grid h-9 w-9 place-items-center rounded-full bg-muted">
+                  <LogOut className="h-4 w-4 text-destructive" />
+                </div>
+                <span className="flex-1 text-left text-sm font-medium text-destructive">
+                  Sign out
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </>
+          ) : (
+            <Row to="/login" icon={LogOut} label="Sign in" />
+          )}
         </div>
       </section>
 

@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ImagePlus, X, FileArchive, Plus, Loader2 } from "lucide-react";
+import { ChevronLeft, ImagePlus, X, FileArchive, Plus, Loader2, ShieldAlert } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { categories } from "@/data/templates";
 import { cn } from "@/lib/utils";
 import { auth } from "@/firebase/config";
 import { uploadTemplateFiles, createTemplate, TemplateData } from "@/services/templateService";
+import { getUserRole } from "@/services/userService";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -34,6 +35,50 @@ function UploadPage() {
   const [zipFile, setZipFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        router.navigate({ to: "/login" });
+        return;
+      }
+      const role = await getUserRole(user.uid);
+      if (role !== "admin" && role !== "developer") {
+        setAccessDenied(true);
+      }
+      setAuthChecking(false);
+    });
+    return () => unsub();
+  }, [router]);
+
+  if (authChecking) {
+    return (
+      <PageShell>
+        <div className="grid min-h-[60vh] place-items-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <PageShell>
+        <div className="grid min-h-[60vh] place-items-center text-center px-6">
+          <div>
+            <ShieldAlert className="mx-auto h-12 w-12 text-destructive" />
+            <h1 className="mt-4 font-display text-2xl font-semibold">Access Denied</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Only developers and admins can upload templates.</p>
+            <Link to="/" className="mt-6 inline-block rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">
+              Go Home
+            </Link>
+          </div>
+        </div>
+      </PageShell>
+    );
+  }
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();

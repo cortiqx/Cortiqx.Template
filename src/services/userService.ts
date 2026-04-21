@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc, query, orderBy } from "firebase/firestore";
 import { db } from "../firebase/config";
 
 export interface UserProfile {
@@ -43,4 +43,11 @@ export const getUserRole = async (uid: string): Promise<string> => {
     return userSnap.data().role;
   }
   return "user";
+};
+
+export const getAllUsers = async (): Promise<UserProfile[]> => {
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, orderBy("createdAt", "desc"));
+  const querySnapshot = await getDocs(q);
+  return querySnapshot.docs.map(doc => doc.data() as UserProfile);
 };

@@ -1,14 +1,22 @@
-import { GoogleAuthProvider, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "./config";
 
 const provider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {
+  // Use redirect instead of popup to avoid Cross-Origin-Opener-Policy (COOP) issues
+  await signInWithRedirect(auth, provider);
+};
+
+export const handleGoogleRedirectResult = async () => {
   try {
-    const result = await signInWithPopup(auth, provider);
-    return result.user;
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      return result.user;
+    }
+    return null;
   } catch (error) {
-    console.error("Error signing in", error);
+    console.error("Error getting redirect result", error);
     throw error;
   }
 };
