@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageShell } from "@/components/PageShell";
 import { TemplateCard } from "@/components/TemplateCard";
-import { categories, templates, type Category } from "@/data/templates";
+import { categories, type Category } from "@/data/templates";
 import { cn } from "@/lib/utils";
+import { getApprovedTemplates, TemplateData } from "@/services/templateService";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -26,12 +27,35 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [active, setActive] = useState<Category | "All">("All");
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getApprovedTemplates().then(data => {
+      // mapping TemplateData to fit the existing UI TemplateCard expectations
+      const mapped = data.map(t => ({
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        price: t.price,
+        category: t.category,
+        tags: t.tags,
+        cover: t.images[0] || "",
+        gallery: t.images,
+        author: t.createdBy, // We'd ideally fetch author name, using ID for now
+        isNew: (Date.now() - t.createdAt) < 7 * 24 * 60 * 60 * 1000,
+        trending: t.downloads > 5
+      }));
+      setTemplates(mapped);
+      setLoading(false);
+    });
+  }, []);
 
   const filtered =
-    active === "All" ? templates : templates.filter((t) => t.category === active);
+    active === "All" ? templates : templates.filter((t: any) => t.category === active);
 
-  const trending = filtered.filter((t) => t.trending);
-  const fresh = filtered.filter((t) => t.isNew);
+  const trending = filtered.filter((t: any) => t.trending);
+  const fresh = filtered.filter((t: any) => t.isNew);
 
   return (
     <PageShell>

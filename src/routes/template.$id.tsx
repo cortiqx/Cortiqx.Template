@@ -1,15 +1,15 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChevronLeft, Heart, Eye, Download, Share2, ChevronLeft as L, ChevronRight as R } from "lucide-react";
+import { ChevronLeft, Heart, Eye, Download, Share2, ChevronLeft as L, ChevronRight as R, Loader2 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { TemplateCard } from "@/components/TemplateCard";
-import { getTemplate, getRelated } from "@/data/templates";
+import { getTemplateById, getApprovedTemplates } from "@/services/templateService";
 import { useSaved } from "@/hooks/use-saved";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/template/$id")({
-  loader: ({ params }) => {
-    const template = getTemplate(params.id);
+  loader: async ({ params }) => {
+    const template = await getTemplateById(params.id);
     if (!template) throw notFound();
     return { template };
   },
@@ -20,8 +20,8 @@ export const Route = createFileRoute("/template/$id")({
           { name: "description", content: loaderData.template.description },
           { property: "og:title", content: `${loaderData.template.title} — Cortiqx Templates` },
           { property: "og:description", content: loaderData.template.description },
-          { property: "og:image", content: loaderData.template.cover },
-          { name: "twitter:image", content: loaderData.template.cover },
+          { property: "og:image", content: loaderData.template.images?.[0] },
+          { name: "twitter:image", content: loaderData.template.images?.[0] },
         ]
       : [],
   }),
@@ -39,22 +39,37 @@ export const Route = createFileRoute("/template/$id")({
 });
 
 function DetailPage() {
-  const { template } = Route.useLoaderData();
+  const { template } = Route.useLoaderData() as any;
   const { isSaved, toggle } = useSaved();
   const liked = isSaved(template.id);
-  const related = getRelated(template.id);
+  const [related, setRelated] = useState<any[]>([]);
   const [idx, setIdx] = useState(0);
+
+  // Fallback map for gallery
+  const gallery = (template.images?.length > 0) ? template.images : (template.gallery || []);
+
+  useState(() => {
+    getApprovedTemplates().then(all => {
+      setRelated(all.filter((x: any) => x.id !== template.id && x.category === template.category).slice(0, 4));
+    });
+  });
 
   return (
     <PageShell hideHeader>
       {/* Carousel */}
       <div className="relative">
         <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-          <img
-            src={template.gallery[idx]}
-            alt={`${template.title} screenshot ${idx + 1}`}
-            className="h-full w-full object-cover"
-          />
+          {gallery.length > 0 ? (
+            <img
+              src={gallery[idx]}
+              alt={`${template.title} screenshot ${idx + 1}`}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+              No images
+            </div>
+          )}
           {/* Top controls */}
           <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
             <Link
@@ -84,45 +99,51 @@ function DetailPage() {
           </div>
 
           {/* Arrows */}
-          <button
-            type="button"
-            aria-label="Previous"
-            onClick={() => setIdx((i) => (i - 1 + template.gallery.length) % template.gallery.length)}
-            className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-background/80 backdrop-blur"
-          >
-            <L className="h-5 w-5" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next"
-            onClick={() => setIdx((i) => (i + 1) % template.gallery.length)}
-            className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-background/80 backdrop-blur"
-          >
-            <R className="h-5 w-5" />
-          </button>
-
-          {/* Counter */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-foreground/80 px-3 py-1 text-xs font-medium text-background">
-            {idx + 1} / {template.gallery.length}
-          </div>
+          {gallery.length > 1 && (
+            <>
+              <button
+                type="button"
+                aria-label="Previous"
+                onClick={() => setIdx((i) => (i - 1 + gallery.length) % gallery.length)}
+                className="absolute left-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-background/80 backdrop-blur"
+              >
+                <L className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next"
+                onClick={() => setIdx((i) => (i + 1) % gallery.length)}
+                className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-background/80 backdrop-blur"
+              >
+                <R className="h-5 w-5" />
+              </button>
+              
+              {/* Counter */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-foreground/80 px-3 py-1 text-xs font-medium text-background">
+                {idx + 1} / {gallery.length}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Thumbnails */}
-        <div className="scrollbar-hide flex gap-2 overflow-x-auto px-4 py-3">
-          {template.gallery.map((src, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setIdx(i)}
-              className={cn(
-                "h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition",
-                idx === i ? "border-primary" : "border-transparent opacity-70",
-              )}
-            >
-              <img src={src} alt={`thumb ${i + 1}`} className="h-full w-full object-cover" />
-            </button>
-          ))}
-        </div>
+        {gallery.length > 1 && (
+          <div className="scrollbar-hide flex gap-2 overflow-x-auto px-4 py-3">
+            {gallery.map((src: string, i: number) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setIdx(i)}
+                className={cn(
+                  "h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 transition",
+                  idx === i ? "border-primary" : "border-transparent opacity-70",
+                )}
+              >
+                <img src={src} alt={`thumb ${i + 1}`} className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Info */}
@@ -133,10 +154,10 @@ function DetailPage() {
         <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
           {template.title}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">by {template.author}</p>
+        <p className="mt-1 text-sm text-muted-foreground">by {template.createdBy || template.author}</p>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          {template.tags.map((t) => (
+          {template.tags?.map((t: string) => (
             <span
               key={t}
               className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground"
@@ -180,15 +201,26 @@ function DetailPage() {
       {/* Sticky action bar */}
       <div className="fixed inset-x-0 bottom-16 z-30 border-t border-border bg-background/95 px-4 py-3 backdrop-blur md:bottom-0">
         <div className="mx-auto flex max-w-3xl items-center gap-2">
+          {template.previewUrl && (
+            <a
+              href={template.previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold hover:bg-muted"
+            >
+              <Eye className="h-4 w-4" />
+              Preview
+            </a>
+          )}
           <button
             type="button"
-            className="flex flex-1 items-center justify-center gap-2 rounded-full border border-border bg-card px-4 py-3 text-sm font-semibold"
-          >
-            <Eye className="h-4 w-4" />
-            Preview
-          </button>
-          <button
-            type="button"
+            onClick={() => {
+              if (template.fileUrl) {
+                window.open(template.fileUrl, '_blank');
+              } else {
+                alert("This template does not have a downloadable file available.");
+              }
+            }}
             className="flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
           >
             <Download className="h-4 w-4" />

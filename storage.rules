@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /templates/{allPaths=**} {
+      // Developers and Admins can upload
+      allow write: if request.auth != null && (
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "developer" ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == "admin"
+      );
+      
+      // Allow authenticated reads for phase 1
+      allow read: if request.auth != null;
+    }
+  }
+}

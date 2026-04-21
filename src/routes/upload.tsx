@@ -1,9 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useRef } from "react";
-import { ChevronLeft, ImagePlus, X, FileArchive, Plus } from "lucide-react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useState, useRef, useEffect } from "react";
+import { ChevronLeft, ImagePlus, X, FileArchive, Plus, Loader2 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { categories } from "@/data/templates";
 import { cn } from "@/lib/utils";
+import { auth } from "@/firebase/config";
+import { uploadTemplateFiles, createTemplate, TemplateData } from "@/services/templateService";
 
 export const Route = createFileRoute("/upload")({
   head: () => ({
@@ -16,11 +18,22 @@ export const Route = createFileRoute("/upload")({
 });
 
 function UploadPage() {
+  const router = useRouter();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [price, setPrice] = useState(0);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  
   const [tags, setTags] = useState<string[]>(["wedding", "minimal"]);
   const [tagInput, setTagInput] = useState("");
   const [previews, setPreviews] = useState<string[]>([]);
+  const [images, setImages] = useState<File[]>([]);
   const [zipName, setZipName] = useState<string | null>(null);
+  const [zipFile, setZipFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const addTag = () => {
     const t = tagInput.trim().toLowerCase();
@@ -34,6 +47,54 @@ function UploadPage() {
     const files = Array.from(e.target.files ?? []).slice(0, 10 - previews.length);
     const urls = files.map((f) => URL.createObjectURL(f));
     setPreviews([...previews, ...urls].slice(0, 10));
+    setImages([...images, ...files].slice(0, 10));
+  };
+
+  const handleZipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setZipName(file.name);
+      setZipFile(file);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+    if (!user) return alert("You must be logged in to upload.");
+    if (!title || !description || !category || images.length === 0) return alert("Please fill all required fields and add at least one image.");
+
+    setIsUploading(true);
+    try {
+      const pathPrefix = `${user.uid}/${Date.now()}`;
+      const { imageUrls, fileUrl } = await uploadTemplateFiles(
+        { images, zip: zipFile || undefined },
+        pathPrefix
+      );
+
+      const newTemplate: Omit<TemplateData, "status" | "downloads" | "createdAt"> = {
+        title,
+        description,
+        category,
+        tags,
+        price,
+        isFree: price === 0,
+        images: imageUrls,
+        previewUrl,
+        githubUrl,
+        fileUrl,
+        createdBy: user.uid,
+      };
+
+      await createTemplate(newTemplate);
+      alert("Template submitted for review!");
+      router.navigate({ to: "/" });
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed. Check console for details.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -48,10 +109,13 @@ function UploadPage() {
         </div>
       </header>
 
-      <form className="space-y-5 px-4 py-5" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-5 px-4 py-5" onSubmit={handleSubmit}>
         <Field label="Title">
           <input
             type="text"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Rose & Vows"
             className="input"
           />
@@ -60,18 +124,37 @@ function UploadPage() {
         <Field label="Description">
           <textarea
             rows={4}
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe your template..."
             className="input resize-none"
           />
         </Field>
 
         <Field label="Category">
-          <select className="input appearance-none" defaultValue="">
+          <select 
+            required 
+            className="input appearance-none" 
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
             <option value="" disabled>Choose a category</option>
             {categories.filter((c) => c.key !== "All").map((c) => (
               <option key={c.key} value={c.key}>{c.label}</option>
             ))}
           </select>
+        </Field>
+
+        <Field label="Price (INR, 0 for Free)">
+          <input
+            type="number"
+            min="0"
+            value={price}
+            onChange={(e) => setPrice(Number(e.target.value))}
+            placeholder="0"
+            className="input"
+          />
         </Field>
 
         <Field label="Tags">
@@ -116,12 +199,12 @@ function UploadPage() {
           </div>
         </Field>
 
-        <Field label="GitHub repo">
-          <input type="url" placeholder="https://github.com/you/repo" className="input" />
+        <Field label="GitHub repo (optional)">
+          <input type="url" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="https://github.com/you/repo" className="input" />
         </Field>
 
-        <Field label="Live preview URL">
-          <input type="url" placeholder="https://your-template.vercel.app" className="input" />
+        <Field label="Live preview URL (optional)">
+          <input type="url" value={previewUrl} onChange={(e) => setPreviewUrl(e.target.value)} placeholder="https://your-template.vercel.app" className="input" />
         </Field>
 
         <Field label={`Screenshots (${previews.length}/10)`}>
@@ -187,16 +270,17 @@ function UploadPage() {
               type="file"
               accept=".zip"
               className="hidden"
-              onChange={(e) => setZipName(e.target.files?.[0]?.name ?? null)}
+              onChange={handleZipChange}
             />
           </label>
         </Field>
 
         <button
           type="submit"
-          className="w-full rounded-full bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] active:scale-[0.99]"
+          disabled={isUploading}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] active:scale-[0.99] disabled:opacity-70"
         >
-          Submit for review
+          {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit for review"}
         </button>
       </form>
 

@@ -1,6 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { Mail, ArrowRight } from "lucide-react";
+import { Mail, ArrowRight, Loader2 } from "lucide-react";
+import { signInWithGoogle, signInWithEmail } from "@/firebase/auth";
+import { syncUser } from "@/services/userService";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -14,6 +16,38 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      const user = await signInWithGoogle();
+      await syncUser(user);
+      router.navigate({ to: "/" });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to sign in with Google.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const user = await signInWithEmail(email, password);
+      await syncUser(user);
+      router.navigate({ to: "/" });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to sign in with email. Check your credentials.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="grid min-h-screen place-items-center bg-background px-6">
@@ -32,7 +66,7 @@ function LoginPage() {
           Enter your email to continue
         </p>
 
-        <form className="mt-8 space-y-3" onSubmit={(e) => e.preventDefault()}>
+        <form className="mt-8 space-y-3" onSubmit={handleEmailSignIn}>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -44,12 +78,23 @@ function LoginPage() {
               className="w-full rounded-full border border-border bg-card py-3.5 pl-11 pr-4 text-sm outline-none focus:border-primary"
             />
           </div>
+          <div className="relative">
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password (used for sign in or creation)"
+              className="w-full rounded-full border border-border bg-card py-3.5 px-4 text-sm outline-none focus:border-primary"
+            />
+          </div>
 
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] active:scale-[0.99]"
+            disabled={loading}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] active:scale-[0.99] disabled:opacity-70"
           >
-            Continue <ArrowRight className="h-4 w-4" />
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"} <ArrowRight className="h-4 w-4" />
           </button>
         </form>
 
@@ -61,7 +106,9 @@ function LoginPage() {
 
         <button
           type="button"
-          className="mt-6 w-full rounded-full border border-border bg-card px-4 py-3 text-sm font-medium"
+          onClick={handleGoogleSignIn}
+          disabled={loading}
+          className="mt-6 w-full rounded-full border border-border bg-card px-4 py-3 text-sm font-medium hover:bg-muted disabled:opacity-70"
         >
           Continue with Google
         </button>
