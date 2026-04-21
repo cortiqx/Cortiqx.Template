@@ -1,23 +1,10 @@
-// Vercel Node.js serverless function adapter for TanStack Start
-// Converts Node.js req/res to Web Fetch API and back
-import { createServer } from "node:http";
-import { Readable } from "node:stream";
-import { URL } from "node:url";
-
-// Dynamically import the built server (ESM)
-let serverHandler = null;
-
-async function getHandler() {
-  if (!serverHandler) {
-    const mod = await import("../dist/server/server.js");
-    serverHandler = mod.default;
-  }
-  return serverHandler;
-}
+// Vercel Node.js serverless function — adapts Web Fetch API to Node.js req/res
+import server from "../dist/server/server.js";
 
 function nodeReqToFetchRequest(req) {
   const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
+  const host =
+    req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
   const url = new URL(req.url, `${proto}://${host}`);
 
   const headers = new Headers();
@@ -32,13 +19,13 @@ function nodeReqToFetchRequest(req) {
   }
 
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
-  const body = hasBody ? Readable.toWeb(req) : undefined;
+  const body = hasBody ? req : undefined;
 
   return new Request(url.toString(), {
     method: req.method,
     headers,
     body,
-    duplex: "half",
+    ...(hasBody ? { duplex: "half" } : {}),
   });
 }
 
@@ -50,24 +37,30 @@ async function fetchResponseToNodeRes(fetchRes, res) {
 
   if (fetchRes.body) {
     const reader = fetchRes.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(value);
-    }
+    const write = () =>
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          res.end();
+          return;
+        }
+        res.write(value);
+        return write();
+      });
+    await write();
+  } else {
+    res.end();
   }
-  res.end();
 }
 
 export default async function handler(req, res) {
   try {
-    const server = await getHandler();
     const fetchReq = nodeReqToFetchRequest(req);
     const fetchRes = await server.fetch(fetchReq);
     await fetchResponseToNodeRes(fetchRes, res);
   } catch (err) {
-    console.error("SSR Error:", err);
+    console.error("[SSR Error]", err?.message, err?.stack);
     res.statusCode = 500;
-    res.end("Internal Server Error");
+    res.setHeader("Content-Type", "text/plain");
+    res.end(`SSR Error: ${err?.message || "Unknown error"}`);
   }
 }
